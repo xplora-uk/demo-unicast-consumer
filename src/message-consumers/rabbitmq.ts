@@ -32,7 +32,11 @@ export function newRabbitMqMessageConsumer(settings: IMessageConsumerConf): Prom
             const payload = message.content.toString('utf-8');
             const output = await input.consume({ payload });
             console.info(funcLambda, { queue: input.queue, message, output });
-            await channelWrapper.ack(message);
+            if (output.success) {
+              await channelWrapper.ack(message); // acknowledge; done
+            } else {
+              await channelWrapper.nack(message); // do not acknowledge; failed
+            }
           } catch (err) {
             console.error(funcLambda, err);
           }

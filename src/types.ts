@@ -1,12 +1,13 @@
 export interface IMessageConsumerSettings {
-  kind: 'rabbitmq' | 'redis' | 'kafka' | string;
-  conf: IMessageConsumerConf;
+  kind : 'rabbitmq' | 'redis' | 'kafka' | string;
+  conf : IMessageConsumerConf;
+  queue: string;
 }
 
 export interface IMessageConsumerConf {
   // TODO: either find common config for different kinds or define separate types for each
   //url     : string;
-  protocol?: string; // amqp, amqps, 
+  protocol?: string;         // amqp, amqps, 
   username : string;
   password : string;
   hostname : string;
