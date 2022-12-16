@@ -24,7 +24,7 @@ export interface IUnicastConsumer {
 
 export interface IStartUnicastConsumingInput {
   queue: string;
-  unicastConsume(input: IConsumeMessageInput): Promise<IConsumeMessageOutput>;
+  unicastConsume(input: IUnicastConsumeInput): Promise<IUnicastConsumeOutput>;
 }
 
 export interface IStartUnicastConsumingOutput {
@@ -32,11 +32,11 @@ export interface IStartUnicastConsumingOutput {
   error  : string | null;
 }
 
-export interface IConsumeMessageInput {
+export interface IUnicastConsumeInput {
   payload: string;
 }
 
-export interface IConsumeMessageOutput {
+export interface IUnicastConsumeOutput {
   success: boolean;
   error  : string | null;
 }

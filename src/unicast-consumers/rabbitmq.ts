@@ -1,7 +1,7 @@
 import amqp from 'amqp-connection-manager';
 import { IAmqpConnectionManager } from 'amqp-connection-manager/dist/esm/AmqpConnectionManager';
-import { ConsumeMessage } from 'amqplib';
-import { IConsumeMessageOutput, IUnicastConsumer, IUnicastConsumerConf, IStartUnicastConsumingInput, IStartUnicastConsumingOutput } from '../types';
+import { Channel, ConsumeMessage } from 'amqplib';
+import { IUnicastConsumeOutput, IUnicastConsumer, IUnicastConsumerConf, IStartUnicastConsumingInput, IStartUnicastConsumingOutput } from '../types';
 
 export function newRabbitMqUnicastConsumer(settings: IUnicastConsumerConf): Promise<IUnicastConsumer> {
 
@@ -16,6 +16,44 @@ export function newRabbitMqUnicastConsumer(settings: IUnicastConsumerConf): Prom
   // noAck: false => manual acknowledgement is needed
   const consumeOptions = { prefetch: 1, noAck: false };
 
+  function makeConsumeWrapper(channel: Channel, input: IStartUnicastConsumingInput) {
+
+    async function consumeWrapper(message: ConsumeMessage | null) {
+      const funcLambda = 'consumeWrapper';
+      try {
+        if (!message) {
+          console.info(funcLambda, 'no message');
+          return;
+        }
+
+        const payload = message.content.toString('utf-8') || '';
+        let output: IUnicastConsumeOutput | null = null;
+        try {
+          output = await input.unicastConsume({ payload });
+          if (!output.success || output.error) {
+            throw new Error(output.error ?? 'unicast message consumer failed');
+          }
+        } catch (err) {
+          output = {
+            success: false,
+            error: err instanceof Error ? err.message : 'Unknown error',
+          };
+        }
+        console.info(funcLambda, { queue: input.queue, message, output });
+        if (output && output.success) {
+          channel.ack(message); // acknowledge; done
+        } else {
+          channel.nack(message); // do not acknowledge; failed
+        }
+      } catch (err) {
+        console.error(funcLambda, err);
+        throw err;
+      }
+    }
+
+    return consumeWrapper;
+  }
+
   class RabbitMqUnicastConsumer implements IUnicastConsumer {
 
     constructor(protected _connection: IAmqpConnectionManager) {
@@ -26,48 +64,21 @@ export function newRabbitMqUnicastConsumer(settings: IUnicastConsumerConf): Prom
       const func = 'RabbitMqUnicastConsumer.startUnicastConsuming';
       let success = false, error = '';
 
-      // TODO: optimize channel creation?
-      // ask the connection manager for a ChannelWrapper
-      const channelWrapper = connection.createChannel();
-
-      // NOTE: If we're not currently connected, these will be queued up in memory until we connect.
-      // `sendToQueue()` returns a Promise which is fulfilled or rejected when the message is actually sent or not.
       try {
-        // our queues are durable 
-        await channelWrapper.assertQueue(input.queue, queueOptions);
-
-        async function consumeWrapper(message: ConsumeMessage) {
-          const funcLambda = func + '.consumeWrapper';
-          try {
-            const payload = message.content.toString('utf-8');
-            let output: IConsumeMessageOutput | null = null;
-            try {
-              output = await input.unicastConsume({ payload });
-            } catch (err) {
-              output = {
-                success: false,
-                error: err instanceof Error ? err.message : 'Unknown error',
-              };
-            }
-            console.info(funcLambda, { queue: input.queue, message, output });
-            if (output && output.success) {
-              channelWrapper.ack(message); // acknowledge; done
-            } else {
-              channelWrapper.nack(message); // do not acknowledge; failed
-            }
-          } catch (err) {
-            console.error(funcLambda, err);
-          }
-        }
-
-        // start consuming messages on queue
-        await channelWrapper.consume(input.queue, consumeWrapper, consumeOptions);
+        // NOTE: If we're not currently connected, these will be queued up in memory until we connect.
+        // ask the connection manager for a ChannelWrapper
+        connection.createChannel({
+          setup: async (channel: Channel) => {
+            await channel.assertQueue(input.queue, queueOptions);
+            const consumeWrapper = makeConsumeWrapper(channel, input);
+            await channel.consume(input.queue, consumeWrapper, consumeOptions);          
+          },
+        });
+        // TODO: save channelWrapper?
         success = true;
       } catch (err) {
         error = err instanceof Error ? err.message : 'Unknown error';
         console.error(func, err);
-      } finally {
-        channelWrapper.close().catch(() => {}); // no op
       }
 
       return { success, error };

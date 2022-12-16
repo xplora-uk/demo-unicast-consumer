@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { newUnicastConsumer } from './unicast-consumers';
-import { IConsumeMessageInput } from './types';
+import { IUnicastConsumeInput } from './types';
 
 export async function factory(penv = process.env) {
   const app = express();
@@ -28,7 +28,7 @@ export async function factory(penv = process.env) {
 
   const output = await ucConsumer.startUnicastConsuming({
     queue,
-    unicastConsume: async (input: IConsumeMessageInput) => {
+    unicastConsume: async (input: IUnicastConsumeInput) => {
       // TODO: do something useful
       console.debug('payload', input.payload);
       return { success: true, error: '' };
