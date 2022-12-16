@@ -1,6 +1,6 @@
 import amqp, { ChannelWrapper } from 'amqp-connection-manager';
 import { IAmqpConnectionManager } from 'amqp-connection-manager/dist/esm/AmqpConnectionManager';
-import { Channel, ConsumeMessage } from 'amqplib';
+import { ConsumeMessage } from 'amqplib';
 import { IUnicastConsumeOutput, IUnicastConsumer, IUnicastConsumerConf, IStartUnicastConsumingInput, IStartUnicastConsumingOutput } from '../types';
 
 const connectionOptions = {
@@ -110,17 +110,6 @@ class RabbitMqUnicastConsumer implements IUnicastConsumer {
 }
 
 export function newRabbitMqUnicastConsumer(settings: IUnicastConsumerConf): Promise<IUnicastConsumer> {
-
-  
-
-  const connection = amqp.connect(
-    {
-      ...settings,
-      connectionOptions: {
-        timeout: 5000,
-      },
-    },
-  );
-
+  const connection = amqp.connect({ ...settings, connectionOptions });
   return Promise.resolve(new RabbitMqUnicastConsumer(connection));
 }
