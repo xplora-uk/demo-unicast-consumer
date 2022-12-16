@@ -12,7 +12,7 @@ export function newRabbitMqUnicastConsumer(settings: IUnicastConsumerConf): Prom
     }
 
     async startUnicastConsuming(input: IStartUnicastConsumingInput): Promise<IStartUnicastConsumingOutput> {
-      const func = 'RabbitMqUnicastConsumer.startConsuming';
+      const func = 'RabbitMqUnicastConsumer.startUnicastConsuming';
       let success = false, error = '';
 
       // TODO: optimize channel creation?
@@ -27,7 +27,7 @@ export function newRabbitMqUnicastConsumer(settings: IUnicastConsumerConf): Prom
 
         // start consuming messages on queue
         await channelWrapper.consume(input.queue, async (message: ConsumeMessage) => {
-          const funcLambda = 'RabbitMqUnicastConsumer.startConsuming.lambda-consume';
+          const funcLambda = 'RabbitMqUnicastConsumer.startUnicastConsuming.lambda-consume';
           try {
             const payload = message.content.toString('utf-8');
             let output: IConsumeMessageOutput | null = null;
