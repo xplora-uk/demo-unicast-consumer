@@ -1,7 +1,7 @@
 import amqp from 'amqp-connection-manager';
 import { IAmqpConnectionManager } from 'amqp-connection-manager/dist/esm/AmqpConnectionManager';
 import { ConsumeMessage } from 'amqplib';
-import { IConsumeMessageOutput, IUnicastConsumer, IUnicastConsumerConf, IStartConsumingInput, IStartConsumingOutput } from '../types';
+import { IConsumeMessageOutput, IUnicastConsumer, IUnicastConsumerConf, IStartUnicastConsumingInput, IStartUnicastConsumingOutput } from '../types';
 
 export function newRabbitMqUnicastConsumer(settings: IUnicastConsumerConf): Promise<IUnicastConsumer> {
 
@@ -11,7 +11,7 @@ export function newRabbitMqUnicastConsumer(settings: IUnicastConsumerConf): Prom
       // nothing to do
     }
 
-    async startConsuming(input: IStartConsumingInput): Promise<IStartConsumingOutput> {
+    async startUnicastConsuming(input: IStartUnicastConsumingInput): Promise<IStartUnicastConsumingOutput> {
       const func = 'RabbitMqUnicastConsumer.startConsuming';
       let success = false, error = '';
 
@@ -32,7 +32,7 @@ export function newRabbitMqUnicastConsumer(settings: IUnicastConsumerConf): Prom
             const payload = message.content.toString('utf-8');
             let output: IConsumeMessageOutput | null = null;
             try {
-              output = await input.consume({ payload });
+              output = await input.unicastConsume({ payload });
             } catch (err) {
               output = {
                 success: false,

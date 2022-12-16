@@ -19,15 +19,15 @@ export interface IUnicastConsumerConf {
 }
 
 export interface IUnicastConsumer {
-  startConsuming(input: IStartConsumingInput): Promise<IStartConsumingOutput>;
+  startUnicastConsuming(input: IStartUnicastConsumingInput): Promise<IStartUnicastConsumingOutput>;
 }
 
-export interface IStartConsumingInput {
+export interface IStartUnicastConsumingInput {
   queue: string;
-  consume(input: IConsumeMessageInput): Promise<IConsumeMessageOutput>;
+  unicastConsume(input: IConsumeMessageInput): Promise<IConsumeMessageOutput>;
 }
 
-export interface IStartConsumingOutput {
+export interface IStartUnicastConsumingOutput {
   success: boolean;
   error  : string | null;
 }

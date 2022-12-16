@@ -24,11 +24,11 @@ export async function factory(penv = process.env) {
     },
   };
 
-  const msgConsumer = await newUnicastConsumer(config.messageConsumer);
+  const ucConsumer = await newUnicastConsumer(config.messageConsumer);
 
-  const output = await msgConsumer.startConsuming({
+  const output = await ucConsumer.startUnicastConsuming({
     queue,
-    consume: async (input: IConsumeMessageInput) => {
+    unicastConsume: async (input: IConsumeMessageInput) => {
       // TODO: do something useful
       console.debug('payload', input.payload);
       return { success: true, error: '' };
@@ -43,5 +43,5 @@ export async function factory(penv = process.env) {
 
   app.get('/health', healthCheck);
 
-  return { app, config, msgConsumer, healthCheck };
+  return { app, config, ucConsumer, healthCheck };
 }

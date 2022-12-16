@@ -6,5 +6,5 @@ export function newUnicastConsumer(settings: IUnicastConsumerSettings): Promise<
     return newRabbitMqUnicastConsumer(settings.conf);
   }
 
-  throw new Error('Unknown message consumer kind');
+  throw new Error('Unknown unicast message consumer kind');
 }
