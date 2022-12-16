@@ -1,18 +1,18 @@
 import amqp from 'amqp-connection-manager';
 import { IAmqpConnectionManager } from 'amqp-connection-manager/dist/esm/AmqpConnectionManager';
 import { ConsumeMessage } from 'amqplib';
-import { IConsumeMessageOutput, IMessageConsumer, IMessageConsumerConf, IStartConsumingInput, IStartConsumingOutput } from '../types';
+import { IConsumeMessageOutput, IUnicastConsumer, IUnicastConsumerConf, IStartConsumingInput, IStartConsumingOutput } from '../types';
 
-export function newRabbitMqMessageConsumer(settings: IMessageConsumerConf): Promise<IMessageConsumer> {
+export function newRabbitMqUnicastConsumer(settings: IUnicastConsumerConf): Promise<IUnicastConsumer> {
 
-  class RabbitMqMessageConsumer implements IMessageConsumer {
+  class RabbitMqUnicastConsumer implements IUnicastConsumer {
 
     constructor(protected _connection: IAmqpConnectionManager) {
       // nothing to do
     }
 
     async startConsuming(input: IStartConsumingInput): Promise<IStartConsumingOutput> {
-      const func = 'RabbitMqMessageConsumer.startConsuming';
+      const func = 'RabbitMqUnicastConsumer.startConsuming';
       let success = false, error = '';
 
       // TODO: optimize channel creation?
@@ -27,7 +27,7 @@ export function newRabbitMqMessageConsumer(settings: IMessageConsumerConf): Prom
 
         // start consuming messages on queue
         await channelWrapper.consume(input.queue, async (message: ConsumeMessage) => {
-          const funcLambda = 'RabbitMqMessageConsumer.startConsuming.lambda-consume';
+          const funcLambda = 'RabbitMqUnicastConsumer.startConsuming.lambda-consume';
           try {
             const payload = message.content.toString('utf-8');
             let output: IConsumeMessageOutput | null = null;
@@ -65,7 +65,7 @@ export function newRabbitMqMessageConsumer(settings: IMessageConsumerConf): Prom
         try {
           await this._connection.close();
         } catch (err) {
-          console.error('RabbitMqMessageConsumer.close error', err);
+          console.error('RabbitMqUnicastConsumer.close error', err);
         }
       }
     }
@@ -80,5 +80,5 @@ export function newRabbitMqMessageConsumer(settings: IMessageConsumerConf): Prom
     },
   );
 
-  return Promise.resolve(new RabbitMqMessageConsumer(connection));
+  return Promise.resolve(new RabbitMqUnicastConsumer(connection));
 }

@@ -1,10 +1,10 @@
-export interface IMessageConsumerSettings {
+export interface IUnicastConsumerSettings {
   kind : 'rabbitmq' | 'redis' | 'kafka' | string;
-  conf : IMessageConsumerConf;
+  conf : IUnicastConsumerConf;
   queue: string;
 }
 
-export interface IMessageConsumerConf {
+export interface IUnicastConsumerConf {
   // TODO: either find common config for different kinds or define separate types for each
   //url     : string;
   protocol?: string;         // amqp, amqps, 
@@ -18,7 +18,7 @@ export interface IMessageConsumerConf {
   heartbeat: number;
 }
 
-export interface IMessageConsumer {
+export interface IUnicastConsumer {
   startConsuming(input: IStartConsumingInput): Promise<IStartConsumingOutput>;
 }
 

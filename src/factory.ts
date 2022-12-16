@@ -1,30 +1,30 @@
 import express, { Request, Response } from 'express';
-import { newMessageConsumer } from './message-consumers';
+import { newUnicastConsumer } from './unicast-consumers';
 import { IConsumeMessageInput } from './types';
 
 export async function factory(penv = process.env) {
   const app = express();
 
-  const queue = String(penv.MC_QUEUE || 'queue');
+  const queue = String(penv.UCC_QUEUE || 'queue');
 
   const config = {
     http: {
       port: Number.parseInt(penv.MB_HTTP_PORT || '3000'),
     },
     messageConsumer: {
-      kind: penv.MC_KIND || 'rabbitmq',
+      kind: penv.UCC_KIND || 'rabbitmq',
       queue,
       conf: {
-        hostname : penv.MC_HOSTNAME || 'localhost',
-        port     : Number.parseInt(penv.MC_PORT || '0'),
-        username : penv.MC_USERNAME || '',
-        password : penv.MC_PASSWORD || '',
+        hostname : penv.UCC_HOSTNAME || 'localhost',
+        port     : Number.parseInt(penv.UCC_PORT || '0'),
+        username : penv.UCC_USERNAME || '',
+        password : penv.UCC_PASSWORD || '',
         heartbeat: 30,
       },
     },
   };
 
-  const msgConsumer = await newMessageConsumer(config.messageConsumer);
+  const msgConsumer = await newUnicastConsumer(config.messageConsumer);
 
   const output = await msgConsumer.startConsuming({
     queue,
@@ -35,7 +35,7 @@ export async function factory(penv = process.env) {
     },
   });
 
-  console.info('message-consumer ready', output);
+  console.info('unicast-consumer ready', output);
 
   async function healthCheck(_req: Request, res: Response) {
     res.json({ status: 'OK', ts: new Date() });

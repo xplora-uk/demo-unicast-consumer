@@ -1,6 +1,6 @@
-# message-consumer-demo
+# unicast-consumer-demo
 
-demo for a message consumer
+demo for a unicast message consumer
 
 ## requirements
 
@@ -33,8 +33,8 @@ Layout:
 
 ```plain
 src/
-  message-consumers/
-    rabbitmq.ts  message consumer adapted for rabbitmq
+  unicast-consumers/
+    rabbitmq.ts  unicast message consumer adapted for rabbitmq
     index.ts     loader for this folder
   factory.ts     prepares dependencies
   index.ts       main entry file of this codebase; prepared express app and starts it.
