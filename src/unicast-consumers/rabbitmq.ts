@@ -5,6 +5,17 @@ import { IConsumeMessageOutput, IUnicastConsumer, IUnicastConsumerConf, IStartUn
 
 export function newRabbitMqUnicastConsumer(settings: IUnicastConsumerConf): Promise<IUnicastConsumer> {
 
+  // When RabbitMQ quits or crashes it will forget the queues and messages 
+  // unless you tell it not to. Two things are required to make sure that messages aren't lost:
+  // we need to mark both the queue and messages as durable.
+  // both publisher and consumer MUST have the same setting
+  const queueOptions = { durable: true };
+
+  // prefetch: 1 => Don't dispatch a new message to a worker until it has processed and acknowledged the previous one.
+  // Instead, dispatch it to the next worker that is not still busy
+  // noAck: false => manual acknowledgement is needed
+  const consumeOptions = { prefetch: 1, noAck: false };
+
   class RabbitMqUnicastConsumer implements IUnicastConsumer {
 
     constructor(protected _connection: IAmqpConnectionManager) {
@@ -22,12 +33,11 @@ export function newRabbitMqUnicastConsumer(settings: IUnicastConsumerConf): Prom
       // NOTE: If we're not currently connected, these will be queued up in memory until we connect.
       // `sendToQueue()` returns a Promise which is fulfilled or rejected when the message is actually sent or not.
       try {
-        // TODO: check queue options
-        await channelWrapper.assertQueue(input.queue, { durable: false });
+        // our queues are durable 
+        await channelWrapper.assertQueue(input.queue, queueOptions);
 
-        // start consuming messages on queue
-        await channelWrapper.consume(input.queue, async (message: ConsumeMessage) => {
-          const funcLambda = 'RabbitMqUnicastConsumer.startUnicastConsuming.lambda-consume';
+        async function consumeWrapper(message: ConsumeMessage) {
+          const funcLambda = func + '.consumeWrapper';
           try {
             const payload = message.content.toString('utf-8');
             let output: IConsumeMessageOutput | null = null;
@@ -41,14 +51,17 @@ export function newRabbitMqUnicastConsumer(settings: IUnicastConsumerConf): Prom
             }
             console.info(funcLambda, { queue: input.queue, message, output });
             if (output && output.success) {
-              await channelWrapper.ack(message); // acknowledge; done
+              channelWrapper.ack(message); // acknowledge; done
             } else {
-              await channelWrapper.nack(message); // do not acknowledge; failed
+              channelWrapper.nack(message); // do not acknowledge; failed
             }
           } catch (err) {
             console.error(funcLambda, err);
           }
-        });
+        }
+
+        // start consuming messages on queue
+        await channelWrapper.consume(input.queue, consumeWrapper, consumeOptions);
         success = true;
       } catch (err) {
         error = err instanceof Error ? err.message : 'Unknown error';
