@@ -9,7 +9,7 @@ export async function factory(penv = process.env) {
 
   const config = {
     http: {
-      port: Number.parseInt(penv.MB_HTTP_PORT || '3000'),
+      port: Number.parseInt(penv.UCC_HTTP_PORT || '3000'),
     },
     messageConsumer: {
       kind: penv.UCC_KIND || 'rabbitmq',
