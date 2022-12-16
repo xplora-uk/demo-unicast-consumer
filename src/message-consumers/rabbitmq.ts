@@ -1,7 +1,7 @@
 import amqp from 'amqp-connection-manager';
 import { IAmqpConnectionManager } from 'amqp-connection-manager/dist/esm/AmqpConnectionManager';
 import { ConsumeMessage } from 'amqplib';
-import { IMessageConsumer, IMessageConsumerConf, IStartConsumingInput, IStartConsumingOutput } from '../types';
+import { IConsumeMessageOutput, IMessageConsumer, IMessageConsumerConf, IStartConsumingInput, IStartConsumingOutput } from '../types';
 
 export function newRabbitMqMessageConsumer(settings: IMessageConsumerConf): Promise<IMessageConsumer> {
 
@@ -30,9 +30,17 @@ export function newRabbitMqMessageConsumer(settings: IMessageConsumerConf): Prom
           const funcLambda = 'RabbitMqMessageConsumer.startConsuming.lambda-consume';
           try {
             const payload = message.content.toString('utf-8');
-            const output = await input.consume({ payload });
+            let output: IConsumeMessageOutput | null = null;
+            try {
+              output = await input.consume({ payload });
+            } catch (err) {
+              output = {
+                success: false,
+                error: err instanceof Error ? err.message : 'Unknown error',
+              };
+            }
             console.info(funcLambda, { queue: input.queue, message, output });
-            if (output.success) {
+            if (output && output.success) {
               await channelWrapper.ack(message); // acknowledge; done
             } else {
               await channelWrapper.nack(message); // do not acknowledge; failed
@@ -50,6 +58,16 @@ export function newRabbitMqMessageConsumer(settings: IMessageConsumerConf): Prom
       }
 
       return { success, error };
+    }
+
+    async close(): Promise<void> {
+      if (this._connection) {
+        try {
+          await this._connection.close();
+        } catch (err) {
+          console.error('RabbitMqMessageConsumer.close error', err);
+        }
+      }
     }
   }
 

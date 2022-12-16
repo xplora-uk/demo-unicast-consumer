@@ -5,9 +5,6 @@ import { IConsumeMessageInput } from './types';
 export async function factory(penv = process.env) {
   const app = express();
 
-  app.use(express.text({ limit: '1MB' }));
-  app.use(express.json({ limit: '1MB' }));
-
   const queue = String(penv.MC_QUEUE || 'queue');
 
   const config = {
