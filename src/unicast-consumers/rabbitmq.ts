@@ -1,16 +1,14 @@
 import amqp, { ChannelWrapper } from 'amqp-connection-manager';
 import { IAmqpConnectionManager } from 'amqp-connection-manager/dist/esm/AmqpConnectionManager';
-import { ConsumeMessage } from 'amqplib';
+import { Channel, ConsumeMessage } from 'amqplib';
 import { IUnicastConsumeOutput, IUnicastConsumer, IUnicastConsumerConf, IStartUnicastConsumingInput, IStartUnicastConsumingOutput } from '../types';
 
-const connectionOptions = {
-  timeout: 5000,
-  heartbeatIntervalInSeconds: 15, // default is 5
-  reconnectTimeInSeconds: 15, // defaults to heartbeatIntervalInSeconds
-};
-
-const channelOptions = {
-  publishTimeout: 10000,
+const connMgrOptions = {
+  heartbeatIntervalInSeconds: 15,   // default is 5
+  reconnectTimeInSeconds    : 15,   // defaults to heartbeatIntervalInSeconds
+  connectionOptions         : {
+    timeout: 5000,
+  },
 };
 
 // When RabbitMQ quits or crashes it will forget the queues and messages 
@@ -34,7 +32,12 @@ function makeConsumeWrapper(channel: ChannelWrapper, input: IStartUnicastConsumi
         return;
       }
 
+      // message.fields.exchange -> ''
+      // message.fields.routingKey -> queue name
       const payload = message.content.toString('utf-8') || '';
+
+      console.info(funcLambda, 'START', { queue: input.queue, message, payload });
+
       let output: IUnicastConsumeOutput | null = null;
       try {
         output = await input.unicastConsume({ payload });
@@ -47,7 +50,9 @@ function makeConsumeWrapper(channel: ChannelWrapper, input: IStartUnicastConsumi
           error: err instanceof Error ? err.message : 'Unknown error',
         };
       }
-      console.info(funcLambda, { queue: input.queue, message, output });
+
+      console.info(funcLambda, 'END', { queue: input.queue, message, payload, output });
+
       if (output && output.success) {
         channel.ack(message); // acknowledge; done
       } else {
@@ -69,13 +74,15 @@ class RabbitMqUnicastConsumer implements IUnicastConsumer {
     // nothing to do
   }
 
-  _channelCache(name: string): ChannelWrapper {
+  protected _channelCache(name: string): ChannelWrapper {
     // NOTE: If we're not currently connected, these will be queued up in memory until we connect.
-    //if (!this._connection.isConnected) { // NOT connected
-    //  this._connection.reconnect();
-    //}
     if (!(name in this._channels) || !this._channels[name]) {
-      this._channels[name] = this._connection.createChannel({ ...channelOptions, name });
+      this._channels[name] = this._connection.createChannel({
+        name,
+        setup: async (ch: Channel) => {
+          return ch.assertQueue(name, queueOptions);
+        },
+      });
     }
     return this._channels[name];
   }
@@ -86,7 +93,6 @@ class RabbitMqUnicastConsumer implements IUnicastConsumer {
 
     try {
       const channelWrapper = this._channelCache(input.queue);
-      await channelWrapper.assertQueue(input.queue, queueOptions);
       const consumeWrapper = makeConsumeWrapper(channelWrapper, input);
       await channelWrapper.consume(input.queue, consumeWrapper, consumeOptions);
       success = true;
@@ -110,6 +116,6 @@ class RabbitMqUnicastConsumer implements IUnicastConsumer {
 }
 
 export function newRabbitMqUnicastConsumer(settings: IUnicastConsumerConf): Promise<IUnicastConsumer> {
-  const connection = amqp.connect({ ...settings, connectionOptions });
+  const connection = amqp.connect(settings, connMgrOptions);
   return Promise.resolve(new RabbitMqUnicastConsumer(connection));
 }

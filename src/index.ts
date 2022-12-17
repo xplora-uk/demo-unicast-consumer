@@ -9,7 +9,7 @@ async function main(penv = process.env) {
   const { app, config } = await factory(penv);
 
   app.listen(config.http.port, () => {
-    console.info('unicast-message-consumer is listening at', config.http.port);
+    console.info('unicast-consumer is listening to', config.messageConsumer.queue, 'at', config.http.port);
   });
 
 }

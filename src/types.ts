@@ -1,21 +1,15 @@
 export interface IUnicastConsumerSettings {
-  kind : 'rabbitmq' | 'redis' | 'kafka' | string;
-  conf : IUnicastConsumerConf;
+  kind: 'rabbitmq' | 'redis' | 'kafka' | string;
+  conf: IUnicastConsumerConf;
+
   queue: string;
+  queueHostBaseUrl: string;
 }
 
 export interface IUnicastConsumerConf {
   // TODO: either find common config for different kinds or define separate types for each
-  //url     : string;
-  protocol?: string;         // amqp, amqps, 
-  username : string;
-  password : string;
-  hostname : string;
-  port     : number;
-  vhost?   : string;
-  locale?  : string;
-  ca?      : Array<Buffer>;
-  heartbeat: number;
+  url: string;
+  ca?: Array<Buffer>;
 }
 
 export interface IUnicastConsumer {
