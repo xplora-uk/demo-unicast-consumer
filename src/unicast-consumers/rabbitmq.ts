@@ -1,7 +1,8 @@
 import amqp, { ChannelWrapper } from 'amqp-connection-manager';
 import { IAmqpConnectionManager } from 'amqp-connection-manager/dist/esm/AmqpConnectionManager';
 import { Channel, ConsumeMessage } from 'amqplib';
-import { IUnicastConsumeOutput, IUnicastConsumer, IUnicastConsumerConf, IStartUnicastConsumingInput, IStartUnicastConsumingOutput } from '../types';
+import { ILogger } from '../loggers/types';
+import { IUnicastConsumeOutput, IUnicastConsumer, IUnicastConsumerConf, IStartUnicastConsumingInput, IStartUnicastConsumingOutput } from './types';
 
 const connMgrOptions = {
   heartbeatIntervalInSeconds: 15,   // default is 5
@@ -22,13 +23,18 @@ const queueOptions = { durable: true };
 // noAck: false => manual acknowledgement is needed
 const consumeOptions = { prefetch: 1, noAck: false };
 
-function makeConsumeWrapper(channel: ChannelWrapper, input: IStartUnicastConsumingInput) {
+function makeConsumeWrapper(
+  senderFunc: string,
+  channel: ChannelWrapper,
+  input: IStartUnicastConsumingInput,
+  logger: ILogger,
+) {
 
   async function consumeWrapper(message: ConsumeMessage | null) {
-    const funcLambda = 'consumeWrapper';
+    const funcLambda = senderFunc + ' consumeWrapper';
     try {
       if (!message) {
-        console.info(funcLambda, 'no message');
+        logger.info(funcLambda + ' no message');
         return;
       }
 
@@ -36,7 +42,8 @@ function makeConsumeWrapper(channel: ChannelWrapper, input: IStartUnicastConsumi
       // message.fields.routingKey -> queue name
       const payload = message.content.toString('utf-8') || '';
 
-      console.info(funcLambda, 'START', { queue: input.queue, message, payload });
+      //logger.debug(funcLambda + ' START', { queue: input.queue, message });
+      logger.info(funcLambda + ' START ' + input.queue, { payload });
 
       let output: IUnicastConsumeOutput | null = null;
       try {
@@ -51,15 +58,17 @@ function makeConsumeWrapper(channel: ChannelWrapper, input: IStartUnicastConsumi
         };
       }
 
-      console.info(funcLambda, 'END', { queue: input.queue, message, payload, output });
+      logger.info(funcLambda + ' END ' + input.queue, { payload, output });
 
       if (output && output.success) {
-        channel.ack(message); // acknowledge; done
+        const ackResult = channel.ack(message); // acknowledge; done
+        logger.info(funcLambda + ' ACK! ' + input.queue, { ackResult });
       } else {
-        channel.nack(message); // do not acknowledge; failed
+        const nackResult = channel.nack(message); // do not acknowledge; failed
+        logger.info(funcLambda + ' NO ACK! ' + input.queue, { nackResult });
       }
     } catch (err) {
-      console.error(funcLambda, err);
+      logger.error(funcLambda, err);
     }
   }
 
@@ -70,7 +79,10 @@ class RabbitMqUnicastConsumer implements IUnicastConsumer {
 
   protected _channels: Record<string, ChannelWrapper> = {};
 
-  constructor(protected _connection: IAmqpConnectionManager) {
+  constructor(
+    protected _connection: IAmqpConnectionManager,
+    protected _logger: ILogger,
+  ) {
     // nothing to do
   }
 
@@ -80,7 +92,10 @@ class RabbitMqUnicastConsumer implements IUnicastConsumer {
       this._channels[name] = this._connection.createChannel({
         name,
         setup: async (ch: Channel) => {
-          return ch.assertQueue(name, queueOptions);
+          this._logger.debug('RabbitMqUnicastConsumer._channelCache.createChannel.setup assertQueue...', { name });
+          const res = await ch.assertQueue(name, queueOptions);
+          this._logger.debug('RabbitMqUnicastConsumer._channelCache.createChannel.setup assertQueue... done!', { name, res });
+          return res;
         },
       });
     }
@@ -92,14 +107,17 @@ class RabbitMqUnicastConsumer implements IUnicastConsumer {
     let success = false, error = '';
 
     try {
+      this._logger.info(func + ' START');
       const channelWrapper = this._channelCache(input.queue);
-      const consumeWrapper = makeConsumeWrapper(channelWrapper, input);
+      const consumeWrapper = makeConsumeWrapper(func, channelWrapper, input, this._logger);
       await channelWrapper.consume(input.queue, consumeWrapper, consumeOptions);
       success = true;
     } catch (err) {
       error = err instanceof Error ? err.message : 'Unknown error';
-      console.error(func, err);
+      this._logger.error(func, { err });
     }
+
+    this._logger.info(func + ' END', { success, error });
 
     return { success, error };
   }
@@ -109,13 +127,16 @@ class RabbitMqUnicastConsumer implements IUnicastConsumer {
       try {
         await this._connection.close();
       } catch (err) {
-        console.error('RabbitMqUnicastConsumer.close error', err);
+        this._logger.error('RabbitMqUnicastConsumer.close error', { err });
       }
     }
   }
 }
 
-export function newRabbitMqUnicastConsumer(settings: IUnicastConsumerConf): Promise<IUnicastConsumer> {
+export function newRabbitMqUnicastConsumer(
+  settings: IUnicastConsumerConf,
+  logger: ILogger,
+): Promise<IUnicastConsumer> {
   const connection = amqp.connect(settings, connMgrOptions);
-  return Promise.resolve(new RabbitMqUnicastConsumer(connection));
+  return Promise.resolve(new RabbitMqUnicastConsumer(connection, logger));
 }

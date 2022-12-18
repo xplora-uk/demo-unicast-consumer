@@ -1,58 +1,61 @@
 import axios from 'axios';
 import express, { Request, Response } from 'express';
+import { makeLogger } from './loggers';
+import { makeUnicastHttpBridge } from './unicast-http-bridge';
 import { newUnicastConsumer } from './unicast-consumers';
-import { IUnicastConsumeInput } from './types';
 
 export async function factory(penv = process.env) {
   const app = express();
 
-  const queue = String(penv.UCC_QUEUE || 'queue');
+  const appId = String(penv.UCC_APP_ID || 'unicast-consumer');
 
-  const queueHostBaseUrl = String(penv.UCC_TARGET_BASE_URL || 'http://queue_host.local');
+  const httpPort = Number.parseInt(penv.UCC_HTTP_PORT || '3000');
+
+  const queue = String(penv.UCC_BROKER_QUEUE || 'queue');
+  const queueHostBaseUrl = String(penv.UCC_TARGET_BASE_URL || 'http://localhost');
 
   const config = {
+    app: {
+      id: appId,
+    },
     http: {
-      port: Number.parseInt(penv.UCC_HTTP_PORT || '3000'),
+      port: Number.isNaN(httpPort) || httpPort <= 0 ? 3000 : httpPort,
+    },
+    logger: {
+      kind: penv.UCC_LOGGER_KIND || 'console',
+      appId,
     },
     messageConsumer: {
-      kind: penv.UCC_KIND || 'rabbitmq',
+      kind: penv.UCC_BROKER_KIND || 'rabbitmq',
       queue,
       queueHostBaseUrl,
       conf: {
-        url: penv.UCC_URL || 'amqp://localhost:5672',
+        url: penv.UCC_BROKER_URL || 'amqp://localhost:5672',
       },
     },
   };
 
-  const ucConsumer = await newUnicastConsumer(config.messageConsumer);
+  const logger = makeLogger(config.logger);
+
+  const ucConsumer = await newUnicastConsumer(config.messageConsumer, logger);
 
   const httpClient = axios.create({
     baseURL: queueHostBaseUrl,
     validateStatus: (status) => status === 200,
   });
 
-  // convention: POST /queue-name body -> payload
-  const callPath = `/${queue}`;
-
-  console.info('unicast-consumer will POST to', queueHostBaseUrl + callPath);
-
-  const output = await ucConsumer.startUnicastConsuming({
-    queue,
-    unicastConsume: async (input: IUnicastConsumeInput) => {
-      // act like a reverse proxy
-      try {
-        const payloadObj = JSON.parse(input.payload);
-        console.debug('unicast-consumer received', payloadObj);
-        const response = await httpClient.post(callPath, payloadObj);
-        console.info('target responded', response.status, response.data);
-        return { success: true, error: '' };
-      } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Target failed' };
-      }
-    },
-  });
-
-  console.info('unicast-consumer started', output);
+  const queues = ['queue1', 'queue2', 'queue3'];
+  for (let q of queues) {
+    const output = await ucConsumer.startUnicastConsuming(
+      makeUnicastHttpBridge({
+        httpClient,
+        logger,
+        queue: q,
+        queueHostBaseUrl,
+      }),
+    );
+    logger.info('started', { q, output });
+  }
 
   async function healthCheck(_req: Request, res: Response) {
     // TODO: check connection to message broker
@@ -61,5 +64,5 @@ export async function factory(penv = process.env) {
 
   app.get('/health', healthCheck);
 
-  return { app, config, ucConsumer, healthCheck };
+  return { app, config, healthCheck, logger, ucConsumer };
 }
