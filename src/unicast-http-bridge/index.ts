@@ -1,7 +1,7 @@
 import { IStartUnicastConsumingInput, IUnicastConsumeInput } from '../unicast-consumers/types';
 import { IUnicastHttpBridgeSettings } from './types';
 
-export function makeUnicastHttpBridge(settings: IUnicastHttpBridgeSettings): IStartUnicastConsumingInput {
+export function newUnicastHttpBridge(settings: IUnicastHttpBridgeSettings): IStartUnicastConsumingInput {
   const { queue, queueHostBaseUrl, logger, httpClient } = settings;
   // convention: POST /queue-name body -> payload
   const callPath = `/${queue}`;

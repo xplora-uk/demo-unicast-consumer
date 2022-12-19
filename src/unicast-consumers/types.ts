@@ -2,7 +2,7 @@ export interface IUnicastConsumerSettings {
   kind: 'rabbitmq' | 'redis' | 'kafka' | string;
   conf: IUnicastConsumerConf;
 
-  queue: string;
+  queues: Array<string>;
   queueHostBaseUrl: string;
 }
 

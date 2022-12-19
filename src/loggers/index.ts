@@ -1,7 +1,7 @@
 import pino from 'pino';
 import { ILogger, ILoggerSettings } from './types';
 
-export function makeLogger(settings: ILoggerSettings): ILogger {
+export function newLogger(settings: ILoggerSettings): ILogger {
 
   const _logger = settings.kind === 'pino' ? pino() : console;
 
